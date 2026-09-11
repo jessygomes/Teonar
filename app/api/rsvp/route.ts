@@ -1,71 +1,106 @@
+import { neon } from "@neondatabase/serverless";
 import { NextResponse } from "next/server";
 
-type RsvpPayload = {
-  nom?: string;
-  prenom?: string;
-  email?: string;
-  telephone?: string;
-  profession?: string;
-  reseauSocial?: string;
-  conciergerie?: string;
-  regimeAlimentaire?: string;
-  regimeCommentaire?: string;
-  attestation?: string;
-};
-
-const REQUIRED_FIELDS: (keyof RsvpPayload)[] = [
-  "nom",
-  "prenom",
-  "email",
-  "telephone",
-  "profession",
-  "conciergerie",
-  "regimeAlimentaire",
-  "attestation",
-];
-
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const sql = neon(process.env.DATABASE_URL!);
 
 export async function POST(request: Request) {
-  let payload: RsvpPayload;
-
   try {
-    payload = await request.json();
-  } catch {
-    return NextResponse.json(
-      { message: "Corps de requête invalide." },
-      { status: 400 }
-    );
-  }
+    const body = await request.json();
 
-  for (const field of REQUIRED_FIELDS) {
-    if (!payload[field]) {
+    const {
+      nom,
+      prenom,
+      email,
+      telephone,
+      profession,
+      reseauSocial,
+      conciergerie,
+      regimeAlimentaire,
+      regimeCommentaire,
+    } = body;
+
+    if (
+      !nom ||
+      !prenom ||
+      !email ||
+      !telephone ||
+      !profession ||
+      !conciergerie ||
+      !regimeAlimentaire
+    ) {
       return NextResponse.json(
-        { message: "Merci de compléter tous les champs obligatoires." },
-        { status: 400 }
+        {
+          message: "Merci de remplir tous les champs obligatoires.",
+        },
+        {
+          status: 400,
+        }
       );
     }
-  }
 
-  if (!EMAIL_REGEX.test(payload.email ?? "")) {
+    const conciergerieBoolean = conciergerie === "oui";
+    const regimeBoolean = regimeAlimentaire === "oui";
+
+    await sql`
+      INSERT INTO rsvp (
+        nom,
+        prenom,
+        email,
+        telephone,
+        profession,
+        reseau_social,
+        conciergerie,
+        regime_alimentaire,
+        regime_commentaire
+      )
+      VALUES (
+        ${nom},
+        ${prenom},
+        ${email.toLowerCase().trim()},
+        ${telephone},
+        ${profession},
+        ${reseauSocial || null},
+        ${conciergerieBoolean},
+        ${regimeBoolean},
+        ${regimeBoolean ? regimeCommentaire || null : null}
+      )
+    `;
+
     return NextResponse.json(
-      { message: "Adresse email invalide." },
-      { status: 400 }
+      {
+        success: true,
+        message: "Votre présence a bien été enregistrée.",
+      },
+      {
+        status: 201,
+      }
+    );
+  } catch (error) {
+    console.error("RSVP ERROR:", error);
+
+    if (
+      error instanceof Error &&
+      error.message.includes("duplicate key value")
+    ) {
+      return NextResponse.json(
+        {
+          message:
+            "Une confirmation existe déjà pour cette adresse email.",
+        },
+        {
+          status: 409,
+        }
+      );
+    }
+
+    return NextResponse.json(
+      {
+        message:
+          "Impossible d'enregistrer votre réponse pour le moment.",
+      },
+      {
+        status: 500,
+      }
     );
   }
-
-  if (
-    payload.regimeAlimentaire === "oui" &&
-    !payload.regimeCommentaire?.trim()
-  ) {
-    return NextResponse.json(
-      { message: "Merci de préciser votre régime alimentaire." },
-      { status: 400 }
-    );
-  }
-
-  // TODO: brancher la persistance (base de données / e-mail) des inscriptions.
-  console.info("Nouvelle inscription TEONAR EVENTUM:", payload);
-
-  return NextResponse.json({ message: "Inscription enregistrée." });
 }
