@@ -21,7 +21,7 @@ export default function SiteIntro() {
       <div className="flex flex-col items-center">
         <div className="intro-logo">
           <Image
-            src="/logo/logo_teo.png"
+            src="/logo/logo_t.png"
             alt="TEONAR"
             width={85}
             height={85}

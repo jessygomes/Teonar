@@ -11,6 +11,7 @@ import { readFile } from "fs/promises";
 import path from "path";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -20,19 +21,32 @@ type InvitationGuest = {
 };
 
 export async function GET(
-  request: Request,
+  _request: Request,
   {
     params,
   }: {
-    params: Promise<{ id: string }>;
+    params: Promise<{
+      id: string;
+    }>;
   }
 ) {
   try {
+    /*
+     * ----------------------------------------------------------------------
+     * 1. RÉCUPÉRATION DE L'INVITÉ
+     * ----------------------------------------------------------------------
+     */
+
     const { id } = await params;
 
-    /*
-     * 1. RÉCUPÉRATION DE L'INVITÉ
-     */
+    if (!id) {
+      return new Response(
+        "Identifiant manquant.",
+        {
+          status: 400,
+        }
+      );
+    }
 
     const rows = (await sql`
       SELECT
@@ -44,15 +58,24 @@ export async function GET(
     `) as InvitationGuest[];
 
     if (!rows.length) {
-      return new Response("Invitation introuvable.", {
-        status: 404,
-      });
+      return new Response(
+        "Invitation introuvable.",
+        {
+          status: 404,
+        }
+      );
     }
 
     const guest = rows[0];
 
     /*
+     * ----------------------------------------------------------------------
      * 2. CHARGEMENT DU PDF DE BASE
+     * ----------------------------------------------------------------------
+     *
+     * Mets le nouveau PDF compact ici :
+     *
+     * public/documents/teonar-faire-part-base.pdf
      */
 
     const pdfPath = path.join(
@@ -62,50 +85,83 @@ export async function GET(
       "teonar-faire-part-base.pdf"
     );
 
-    const basePdf = await readFile(pdfPath);
+    const basePdf =
+      await readFile(pdfPath);
 
-    const pdfDocument = await PDFDocument.load(basePdf);
+    const pdfDocument =
+      await PDFDocument.load(basePdf);
 
     /*
+     * ----------------------------------------------------------------------
      * 3. POLICE DU NOM
+     * ----------------------------------------------------------------------
      *
-     * HelveticaBold donne ici un rendu proche
-     * d'un SemiBold.
+     * HelveticaBold donne ici un résultat
+     * proche du SemiBold recherché.
      */
 
-    const nameFont = await pdfDocument.embedFont(
-      StandardFonts.HelveticaBold
-    );
+    const nameFont =
+      await pdfDocument.embedFont(
+        StandardFonts.HelveticaBold
+      );
 
     /*
-     * 4. TEXTE
+     * ----------------------------------------------------------------------
+     * 4. PRÉNOM + NOM
+     * ----------------------------------------------------------------------
      */
 
-    const fullName = `${guest.prenom} ${guest.nom}`
-      .trim()
-      .toUpperCase();
+    const fullName =
+      `${guest.prenom} ${guest.nom}`
+        .trim()
+        .toUpperCase();
 
-    const pages = pdfDocument.getPages();
-    const page = pages[0];
+    const pages =
+      pdfDocument.getPages();
+
+    if (!pages.length) {
+      throw new Error(
+        "Le PDF ne contient aucune page."
+      );
+    }
+
+    const page =
+      pages[0];
 
     /*
-     * 5. STYLE / POSITION
+     * ----------------------------------------------------------------------
+     * 5. STYLE DU NOM
+     * ----------------------------------------------------------------------
      */
 
     const fontSize = 11;
 
-    // Espacement premium entre les caractères.
+    /*
+     * Espacement entre les caractères
+     * pour rester cohérent avec la DA TEONAR.
+     */
+
     const tracking = 1.35;
 
     /*
-     * Position verticale du nom :
-     * sous "Votre présence est confirmée"
-     * et au-dessus de la ligne bronze.
+     * NOUVELLE POSITION POUR LE PDF COMPACT.
+     *
+     * Le nom est maintenant placé dans l'espace :
+     *
+     * VOTRE PRÉSENCE EST CONFIRMÉE
+     *
+     *        PRÉNOM NOM
+     *        ──────────
+     *
+     * La Maison TEONAR...
      */
-    const y = 536;
+
+    const y = 458;
 
     /*
-     * 6. NOM PARFAITEMENT CENTRÉ
+     * ----------------------------------------------------------------------
+     * 6. DESSIN DU NOM PARFAITEMENT CENTRÉ
+     * ----------------------------------------------------------------------
      */
 
     drawCenteredTrackedText({
@@ -118,28 +174,37 @@ export async function GET(
     });
 
     /*
+     * ----------------------------------------------------------------------
      * 7. GÉNÉRATION DU PDF
+     * ----------------------------------------------------------------------
      */
 
-    const pdfBytes = await pdfDocument.save();
+    const pdfBytes =
+      await pdfDocument.save();
 
     /*
+     * ----------------------------------------------------------------------
      * 8. NOM DU FICHIER
+     * ----------------------------------------------------------------------
      */
 
-    const safeFirstName = sanitizeFilename(
-      guest.prenom
-    );
+    const safeFirstName =
+      sanitizeFilename(
+        guest.prenom
+      );
 
-    const safeLastName = sanitizeFilename(
-      guest.nom
-    );
+    const safeLastName =
+      sanitizeFilename(
+        guest.nom
+      );
 
     const filename =
       `TEONAR-Invitation-${safeFirstName}-${safeLastName}.pdf`;
 
     /*
+     * ----------------------------------------------------------------------
      * 9. TÉLÉCHARGEMENT
+     * ----------------------------------------------------------------------
      */
 
     return new Response(
@@ -148,13 +213,25 @@ export async function GET(
         status: 200,
 
         headers: {
-          "Content-Type": "application/pdf",
+          "Content-Type":
+            "application/pdf",
 
           "Content-Disposition":
             `attachment; filename="${filename}"`,
 
+          /*
+           * Important pour éviter que Vercel / navigateur
+           * renvoie une ancienne version personnalisée.
+           */
+
           "Cache-Control":
-            "private, no-store, max-age=0",
+            "private, no-store, no-cache, max-age=0, must-revalidate",
+
+          Pragma:
+            "no-cache",
+
+          Expires:
+            "0",
         },
       }
     );
@@ -178,11 +255,16 @@ export async function GET(
  * TEXTE CENTRÉ AVEC TRACKING
  * ==========================================================================
  *
- * Le texte est dessiné caractère par caractère.
+ * On dessine les caractères individuellement plutôt que d'utiliser
+ * simplement characterSpacing.
  *
- * Ça permet de connaître sa largeur RÉELLE,
- * tracking compris, et donc de le centrer
- * exactement sur la page.
+ * Ça permet de calculer :
+ *
+ * largeur des lettres
+ * +
+ * largeur du tracking
+ *
+ * puis de centrer exactement l'ensemble sur la page.
  */
 
 function drawCenteredTrackedText({
@@ -200,48 +282,78 @@ function drawCenteredTrackedText({
   tracking: number;
   y: number;
 }) {
-  const { width: pageWidth } =
-    page.getSize();
-
   /*
-   * Largeur de chaque caractère.
+   * Largeur physique de la page.
    */
 
-  const characterWidths = Array.from(
-    text
-  ).map((character) =>
-    font.widthOfTextAtSize(
-      character,
-      fontSize
-    )
-  );
+  const {
+    width: pageWidth,
+  } = page.getSize();
 
   /*
-   * Largeur réelle du texte :
-   *
-   * caractères
-   * +
-   * espaces entre chaque caractère.
+   * On convertit correctement le texte
+   * en tableau de caractères.
    */
 
-  const charactersWidth =
+  const characters =
+    Array.from(text);
+
+  /*
+   * Largeur individuelle de chaque caractère.
+   */
+
+  const characterWidths =
+    characters.map(
+      (character) =>
+        font.widthOfTextAtSize(
+          character,
+          fontSize
+        )
+    );
+
+  /*
+   * Largeur cumulée des lettres.
+   */
+
+  const lettersWidth =
     characterWidths.reduce(
-      (total, width) =>
-        total + width,
+      (
+        total,
+        characterWidth
+      ) =>
+        total +
+        characterWidth,
       0
     );
 
+  /*
+   * Largeur ajoutée par le tracking.
+   *
+   * Exemple :
+   *
+   * TEONAR
+   *
+   * 6 caractères
+   * = 5 espaces de tracking.
+   */
+
   const trackingWidth =
-    Math.max(text.length - 1, 0) *
-    tracking;
+    Math.max(
+      characters.length - 1,
+      0
+    ) * tracking;
+
+  /*
+   * Largeur finale réellement affichée.
+   */
 
   const totalWidth =
-    charactersWidth +
+    lettersWidth +
     trackingWidth;
 
   /*
-   * X EXACT pour centrer le texte
-   * au milieu physique de la page.
+   * Point de départ exact permettant
+   * de centrer le texte sur la page.
    */
 
   let currentX =
@@ -251,15 +363,20 @@ function drawCenteredTrackedText({
    * Dessin caractère par caractère.
    */
 
-  Array.from(text).forEach(
-    (character, index) => {
+  characters.forEach(
+    (
+      character,
+      index
+    ) => {
       page.drawText(
         character,
         {
           x: currentX,
           y,
 
-          size: fontSize,
+          size:
+            fontSize,
+
           font,
 
           color: rgb(
@@ -270,17 +387,38 @@ function drawCenteredTrackedText({
         }
       );
 
+      /*
+       * Déplacement pour la prochaine lettre.
+       */
+
       currentX +=
-        characterWidths[index] +
-        tracking;
+        characterWidths[index];
+
+      /*
+       * Pas besoin de tracking après
+       * le dernier caractère.
+       */
+
+      if (
+        index <
+        characters.length - 1
+      ) {
+        currentX +=
+          tracking;
+      }
     }
   );
 }
 
 /*
  * ==========================================================================
- * NOM DU FICHIER
+ * NETTOYAGE DU NOM DU FICHIER
  * ==========================================================================
+ *
+ * Exemple :
+ *
+ * "Léa" → "Lea"
+ * "De Saint Martin" → "De-Saint-Martin"
  */
 
 function sanitizeFilename(
