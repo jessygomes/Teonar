@@ -47,12 +47,6 @@ export default function AdminDashboard({
   const router =
     useRouter();
 
-  /*
-   * ------------------------------------------------------------------------
-   * INVITÉS
-   * ------------------------------------------------------------------------
-   */
-
   const [
     localGuests,
     setLocalGuests,
@@ -61,23 +55,11 @@ export default function AdminDashboard({
       guests
     );
 
-  /*
-   * Si router.refresh() récupère
-   * de nouvelles données depuis Neon,
-   * on resynchronise la liste locale.
-   */
-
   useEffect(() => {
     setLocalGuests(
       guests
     );
   }, [guests]);
-
-  /*
-   * ------------------------------------------------------------------------
-   * FILTRES
-   * ------------------------------------------------------------------------
-   */
 
   const [
     search,
@@ -109,12 +91,6 @@ export default function AdminDashboard({
       "recent"
     );
 
-  /*
-   * ------------------------------------------------------------------------
-   * SUPPRESSION
-   * ------------------------------------------------------------------------
-   */
-
   const [
     deletingId,
     setDeletingId,
@@ -139,10 +115,6 @@ export default function AdminDashboard({
       const result =
         localGuests.filter(
           (guest) => {
-            /*
-             * Recherche
-             */
-
             const searchableValues =
               [
                 guest.nom,
@@ -165,10 +137,6 @@ export default function AdminDashboard({
                     )
               );
 
-            /*
-             * Conciergerie
-             */
-
             const matchesConcierge =
               conciergeFilter ===
                 "all" ||
@@ -178,10 +146,6 @@ export default function AdminDashboard({
               (conciergeFilter ===
                 "no" &&
                 !guest.conciergerie);
-
-            /*
-             * Régime alimentaire
-             */
 
             const matchesDiet =
               dietFilter ===
@@ -200,10 +164,6 @@ export default function AdminDashboard({
             );
           }
         );
-
-      /*
-       * TRI
-       */
 
       return [
         ...result,
@@ -255,7 +215,7 @@ export default function AdminDashboard({
 
   /*
    * ------------------------------------------------------------------------
-   * STATISTIQUES
+   * STATS
    * ------------------------------------------------------------------------
    */
 
@@ -273,7 +233,7 @@ export default function AdminDashboard({
 
   /*
    * ------------------------------------------------------------------------
-   * DÉCONNEXION
+   * LOGOUT
    * ------------------------------------------------------------------------
    */
 
@@ -286,7 +246,9 @@ export default function AdminDashboard({
         }
       );
     } finally {
-      router.push("/teonar-admin");
+      router.push(
+        "/teonar-admin/login"
+      );
 
       router.refresh();
     }
@@ -294,17 +256,13 @@ export default function AdminDashboard({
 
   /*
    * ------------------------------------------------------------------------
-   * SUPPRESSION D'UN INVITÉ
+   * DELETE
    * ------------------------------------------------------------------------
    */
 
   async function deleteGuest(
     guest: Guest
   ) {
-    /*
-     * Confirmation navigateur.
-     */
-
     const confirmed =
       window.confirm(
         `Supprimer définitivement ${guest.prenom} ${guest.nom} de la liste des invités ?`
@@ -319,10 +277,6 @@ export default function AdminDashboard({
         guest.id
       );
 
-      /*
-       * Requête DELETE.
-       */
-
       const response =
         await fetch(
           `/api/admin/rsvp/${guest.id}`,
@@ -334,20 +288,6 @@ export default function AdminDashboard({
               "no-store",
           }
         );
-
-      /*
-       * On ne fait PAS :
-       *
-       * await response.json()
-       *
-       * directement.
-       *
-       * Si Next renvoie une page HTML ou
-       * une réponse vide lors d'une erreur,
-       * response.json() provoquerait :
-       *
-       * Unexpected end of JSON input
-       */
 
       const responseText =
         await response.text();
@@ -366,18 +306,9 @@ export default function AdminDashboard({
               responseText
             );
         } catch {
-          /*
-           * Réponse non JSON.
-           *
-           * On laisse data à null.
-           */
           data = null;
         }
       }
-
-      /*
-       * Erreur API.
-       */
 
       if (!response.ok) {
         throw new Error(
@@ -385,11 +316,6 @@ export default function AdminDashboard({
             `Erreur lors de la suppression (${response.status}).`
         );
       }
-
-      /*
-       * Suppression immédiate dans
-       * l'interface.
-       */
 
       setLocalGuests(
         (
@@ -403,10 +329,6 @@ export default function AdminDashboard({
               guest.id
           )
       );
-
-      /*
-       * Mise à jour du Server Component.
-       */
 
       router.refresh();
     } catch (error) {
@@ -470,37 +392,24 @@ export default function AdminDashboard({
       )}"`;
     }
 
-    /*
-     * L'export respecte les filtres actifs.
-     */
-
     const rows =
       filteredGuests.map(
         (guest) => [
           guest.prenom,
-
           guest.nom,
-
           guest.email,
-
           guest.telephone,
-
           guest.profession,
-
           guest.reseau_social ??
             "",
-
           guest.conciergerie
             ? "Oui"
             : "Non",
-
           guest.regime_alimentaire
             ? "Oui"
             : "Non",
-
           guest.regime_commentaire ??
             "",
-
           new Date(
             guest.created_at
           ).toLocaleString(
@@ -525,11 +434,6 @@ export default function AdminDashboard({
             .join(";")
       ),
     ].join("\n");
-
-    /*
-     * BOM UTF-8 pour éviter les problèmes
-     * d'accents dans Excel.
-     */
 
     const blob =
       new Blob(
@@ -572,18 +476,12 @@ export default function AdminDashboard({
     );
   }
 
-  /*
-   * ------------------------------------------------------------------------
-   * UI
-   * ------------------------------------------------------------------------
-   */
-
   return (
     <main className="min-h-screen bg-[#F1EEE7] text-[#171512]">
       {/* HEADER */}
 
-      <header className="border-b border-black/10 px-6 py-7 lg:px-10">
-        <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-6">
+      <header className="border-b border-black/10 px-5 py-6 sm:px-6 lg:px-10">
+        <div className="mx-auto flex max-w-[1600px] flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="font-rubik text-[8px] uppercase tracking-[0.45em] text-[#815B3E]">
               TEONAR EVENTUM
@@ -594,31 +492,29 @@ export default function AdminDashboard({
             </h1>
           </div>
 
-          <div className="flex items-center gap-3">
-            {/* ACTUALISER */}
-
+          <div className="flex w-full gap-2 sm:w-auto">
             <button
               type="button"
               onClick={() =>
                 router.refresh()
               }
               className="
+                flex-1
                 border
                 border-black/15
-                px-5
+                px-4
                 py-3
                 font-rubik
                 text-[8px]
                 uppercase
-                tracking-[0.25em]
+                tracking-[0.22em]
                 transition-colors
                 hover:bg-black/5
+                sm:flex-none
               "
             >
               Actualiser
             </button>
-
-            {/* DÉCONNEXION */}
 
             <button
               type="button"
@@ -626,16 +522,18 @@ export default function AdminDashboard({
                 logout
               }
               className="
+                flex-1
                 bg-[#171512]
-                px-5
+                px-4
                 py-3
                 font-rubik
                 text-[8px]
                 uppercase
-                tracking-[0.25em]
+                tracking-[0.22em]
                 text-white
                 transition-colors
                 hover:bg-[#815B3E]
+                sm:flex-none
               "
             >
               Déconnexion
@@ -644,23 +542,19 @@ export default function AdminDashboard({
         </div>
       </header>
 
-      {/* CONTENU */}
-
-      <div className="mx-auto max-w-[1600px] px-6 py-10 lg:px-10">
+      <div className="mx-auto max-w-[1600px] px-5 py-8 sm:px-6 sm:py-10 lg:px-10">
         {/* TITRE */}
 
-        <div className="mb-10 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+        <div className="mb-8 flex flex-col gap-6 sm:mb-10 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="font-rubik text-[9px] uppercase tracking-[0.4em] text-[#815B3E]">
               Invitations
             </p>
 
-            <h2 className="mt-3 font-display text-4xl font-light tracking-[-0.025em] lg:text-5xl">
+            <h2 className="mt-3 font-display text-3xl font-light tracking-[-0.025em] sm:text-4xl lg:text-5xl">
               Liste des invités
             </h2>
           </div>
-
-          {/* EXPORT */}
 
           <button
             type="button"
@@ -668,7 +562,7 @@ export default function AdminDashboard({
               exportCSV
             }
             className="
-              w-fit
+              w-full
               border
               border-[#171512]
               px-6
@@ -681,6 +575,8 @@ export default function AdminDashboard({
 
               hover:bg-[#171512]
               hover:text-[#F1EEE7]
+
+              sm:w-fit
             "
           >
             Exporter CSV
@@ -689,9 +585,10 @@ export default function AdminDashboard({
 
         {/* STATS */}
 
-        <div className="mb-10 grid grid-cols-1 border border-black/10 sm:grid-cols-3">
+        <div className="mb-8 grid grid-cols-3 border border-black/10 sm:mb-10">
           <Stat
             label="Invités"
+            mobileLabel="Invités"
             value={
               localGuests.length
             }
@@ -699,6 +596,7 @@ export default function AdminDashboard({
 
           <Stat
             label="Conciergerie"
+            mobileLabel="Concierg."
             value={
               conciergeCount
             }
@@ -706,6 +604,7 @@ export default function AdminDashboard({
 
           <Stat
             label="Régimes particuliers"
+            mobileLabel="Régimes"
             value={
               dietCount
             }
@@ -715,9 +614,7 @@ export default function AdminDashboard({
 
         {/* FILTRES */}
 
-        <div className="mb-8 grid gap-4 lg:grid-cols-[1fr_auto_auto_auto]">
-          {/* RECHERCHE */}
-
+        <div className="mb-7 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_auto_auto_auto]">
           <input
             value={
               search
@@ -733,20 +630,23 @@ export default function AdminDashboard({
             }
             placeholder="Rechercher un invité..."
             className="
+              min-w-0
               border
               border-black/15
               bg-transparent
-              px-5
-              py-4
+              px-4
+              py-3.5
               font-rubik
               text-sm
               outline-none
               placeholder:text-black/30
               focus:border-[#815B3E]
+              sm:col-span-2
+              lg:col-span-1
+              lg:px-5
+              lg:py-4
             "
           />
-
-          {/* CONCIERGERIE */}
 
           <select
             value={
@@ -762,14 +662,17 @@ export default function AdminDashboard({
               )
             }
             className="
+              min-w-0
               border
               border-black/15
-              bg-transparent
-              px-5
-              py-4
+              bg-[#F1EEE7]
+              px-4
+              py-3.5
               font-rubik
               text-xs
               outline-none
+              lg:px-5
+              lg:py-4
             "
           >
             <option value="all">
@@ -785,8 +688,6 @@ export default function AdminDashboard({
             </option>
           </select>
 
-          {/* RÉGIME */}
-
           <select
             value={
               dietFilter
@@ -801,14 +702,17 @@ export default function AdminDashboard({
               )
             }
             className="
+              min-w-0
               border
               border-black/15
-              bg-transparent
-              px-5
-              py-4
+              bg-[#F1EEE7]
+              px-4
+              py-3.5
               font-rubik
               text-xs
               outline-none
+              lg:px-5
+              lg:py-4
             "
           >
             <option value="all">
@@ -824,8 +728,6 @@ export default function AdminDashboard({
             </option>
           </select>
 
-          {/* TRI */}
-
           <select
             value={
               sort
@@ -840,14 +742,19 @@ export default function AdminDashboard({
               )
             }
             className="
+              min-w-0
               border
               border-black/15
-              bg-transparent
-              px-5
-              py-4
+              bg-[#F1EEE7]
+              px-4
+              py-3.5
               font-rubik
               text-xs
               outline-none
+              sm:col-span-2
+              lg:col-span-1
+              lg:px-5
+              lg:py-4
             "
           >
             <option value="recent">
@@ -868,7 +775,7 @@ export default function AdminDashboard({
           </select>
         </div>
 
-        {/* NOMBRE DE RÉSULTATS */}
+        {/* NOMBRE RÉSULTATS */}
 
         <p className="mb-4 font-rubik text-[9px] uppercase tracking-[0.3em] text-black/40">
           {
@@ -881,10 +788,189 @@ export default function AdminDashboard({
             : ""}
         </p>
 
-        {/* TABLE */}
+        {/* ================================================================ */}
+        {/* MOBILE                                                           */}
+        {/* ================================================================ */}
 
-        <div className="overflow-x-auto border border-black/10 bg-[#F7F4EE]">
-          <table className="w-full min-w-[1500px] border-collapse text-left">
+        <div className="flex flex-col gap-4 md:hidden">
+          {filteredGuests.map(
+            (
+              guest
+            ) => (
+              <article
+                key={
+                  guest.id
+                }
+                className="
+                  border
+                  border-black/10
+                  bg-[#F7F4EE]
+                "
+              >
+                {/* CARD HEADER */}
+
+                <div className="flex items-start justify-between gap-4 border-b border-black/10 p-5">
+                  <div className="min-w-0">
+                    <p className="font-rubik text-base font-medium">
+                      {
+                        guest.prenom
+                      }{" "}
+                      {
+                        guest.nom
+                      }
+                    </p>
+
+                    <p className="mt-1 font-rubik text-[10px] uppercase tracking-[0.2em] text-black/35">
+                      {formatDate(
+                        guest.created_at
+                      )}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={
+                      deletingId ===
+                      guest.id
+                    }
+                    onClick={() =>
+                      deleteGuest(
+                        guest
+                      )
+                    }
+                    aria-label={`Supprimer ${guest.prenom} ${guest.nom}`}
+                    className="
+                      flex
+                      h-9
+                      w-9
+                      shrink-0
+                      items-center
+                      justify-center
+                      border
+                      border-red-900/15
+                      text-red-800
+                      transition-colors
+                      hover:bg-red-900
+                      hover:text-white
+                      disabled:opacity-40
+                    "
+                  >
+                    {deletingId ===
+                    guest.id ? (
+                      <span className="h-3.5 w-3.5 animate-spin rounded-full border border-current/30 border-t-current" />
+                    ) : (
+                      <TrashIcon />
+                    )}
+                  </button>
+                </div>
+
+                {/* INFORMATIONS */}
+
+                <div className="p-5">
+                  <MobileInfo
+                    label="Email"
+                  >
+                    <a
+                      href={`mailto:${guest.email}`}
+                      className="break-all text-[#171512]"
+                    >
+                      {
+                        guest.email
+                      }
+                    </a>
+                  </MobileInfo>
+
+                  <MobileInfo
+                    label="Téléphone"
+                  >
+                    <a
+                      href={`tel:${guest.telephone}`}
+                      className="text-[#171512]"
+                    >
+                      {
+                        guest.telephone
+                      }
+                    </a>
+                  </MobileInfo>
+
+                  <MobileInfo
+                    label="Profession"
+                  >
+                    {
+                      guest.profession
+                    }
+                  </MobileInfo>
+
+                  <MobileInfo
+                    label="Réseau"
+                  >
+                    {guest.reseau_social ||
+                      "—"}
+                  </MobileInfo>
+
+                  <div className="mt-5 grid grid-cols-2 gap-3">
+                    <div className="border border-black/10 p-4">
+                      <p className="mb-3 font-rubik text-[8px] uppercase tracking-[0.22em] text-black/35">
+                        Conciergerie
+                      </p>
+
+                      <StatusBadge
+                        value={
+                          guest.conciergerie
+                        }
+                      />
+                    </div>
+
+                    <div className="border border-black/10 p-4">
+                      <p className="mb-3 font-rubik text-[8px] uppercase tracking-[0.22em] text-black/35">
+                        Régime
+                      </p>
+
+                      <StatusBadge
+                        value={
+                          guest.regime_alimentaire
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  {guest.regime_alimentaire &&
+                    guest.regime_commentaire && (
+                      <div className="mt-3 border-l border-[#815B3E] pl-4">
+                        <p className="font-rubik text-[8px] uppercase tracking-[0.2em] text-[#815B3E]">
+                          Précisions
+                        </p>
+
+                        <p className="mt-2 font-rubik text-xs leading-5 text-black/60">
+                          {
+                            guest.regime_commentaire
+                          }
+                        </p>
+                      </div>
+                    )}
+                </div>
+              </article>
+            )
+          )}
+
+          {filteredGuests.length ===
+            0 && (
+            <div className="border border-black/10 bg-[#F7F4EE] px-6 py-16 text-center">
+              <p className="font-rubik text-sm text-black/40">
+                Aucun invité ne
+                correspond à ces
+                critères.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* ================================================================ */}
+        {/* TABLETTE / DESKTOP                                                */}
+        {/* ================================================================ */}
+
+        <div className="hidden overflow-x-auto border border-black/10 bg-[#F7F4EE] md:block">
+          <table className="w-full min-w-[1450px] border-collapse text-left">
             <thead>
               <tr className="border-b border-black/10">
                 <TableHeader>
@@ -939,8 +1025,6 @@ export default function AdminDashboard({
                       hover:bg-black/[0.025]
                     "
                   >
-                    {/* INVITÉ */}
-
                     <TableCell>
                       <p className="font-rubik text-sm font-medium">
                         {
@@ -951,8 +1035,6 @@ export default function AdminDashboard({
                         }
                       </p>
                     </TableCell>
-
-                    {/* CONTACT */}
 
                     <TableCell>
                       <a
@@ -987,22 +1069,16 @@ export default function AdminDashboard({
                       </a>
                     </TableCell>
 
-                    {/* PROFESSION */}
-
                     <TableCell>
                       {
                         guest.profession
                       }
                     </TableCell>
 
-                    {/* RÉSEAU */}
-
                     <TableCell>
                       {guest.reseau_social ||
                         "—"}
                     </TableCell>
-
-                    {/* CONCIERGERIE */}
 
                     <TableCell>
                       <StatusBadge
@@ -1011,8 +1087,6 @@ export default function AdminDashboard({
                         }
                       />
                     </TableCell>
-
-                    {/* RÉGIME */}
 
                     <TableCell>
                       <StatusBadge
@@ -1031,42 +1105,17 @@ export default function AdminDashboard({
                         )}
                     </TableCell>
 
-                    {/* DATE */}
-
                     <TableCell>
-                      {new Date(
+                      {formatDate(
                         guest.created_at
-                      ).toLocaleDateString(
-                        "fr-FR",
-                        {
-                          day:
-                            "2-digit",
-
-                          month:
-                            "2-digit",
-
-                          year:
-                            "numeric",
-                        }
                       )}
 
                       <p className="mt-1 text-[10px] text-black/35">
-                        {new Date(
+                        {formatTime(
                           guest.created_at
-                        ).toLocaleTimeString(
-                          "fr-FR",
-                          {
-                            hour:
-                              "2-digit",
-
-                            minute:
-                              "2-digit",
-                          }
                         )}
                       </p>
                     </TableCell>
-
-                    {/* ACTION */}
 
                     <TableCell>
                       <button
@@ -1111,8 +1160,6 @@ export default function AdminDashboard({
                 )
               )}
 
-              {/* AUCUN RÉSULTAT */}
-
               {filteredGuests.length ===
                 0 && (
                 <tr>
@@ -1145,32 +1192,74 @@ export default function AdminDashboard({
 
 /*
  * ==========================================================================
+ * MOBILE INFO
+ * ==========================================================================
+ */
+
+function MobileInfo({
+  label,
+  children,
+}: {
+  label: string;
+  children:
+    ReactNode;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-5 border-b border-black/[0.07] py-3.5 first:pt-0">
+      <p className="shrink-0 font-rubik text-[8px] uppercase tracking-[0.2em] text-black/35">
+        {label}
+      </p>
+
+      <div className="min-w-0 text-right font-rubik text-xs leading-5 text-black/65">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/*
+ * ==========================================================================
  * STAT
  * ==========================================================================
  */
 
 function Stat({
   label,
+  mobileLabel,
   value,
   last = false,
 }: {
   label: string;
+  mobileLabel: string;
   value: number;
   last?: boolean;
 }) {
   return (
     <div
-      className={`p-7 ${
-        !last
-          ? "border-b border-black/10 sm:border-b-0 sm:border-r"
-          : ""
-      }`}
+      className={`
+        min-w-0
+        px-3
+        py-5
+        sm:p-7
+
+        ${
+          !last
+            ? "border-r border-black/10"
+            : ""
+        }
+      `}
     >
-      <p className="font-rubik text-[8px] uppercase tracking-[0.35em] text-black/40">
+      <p className="truncate font-rubik text-[7px] uppercase tracking-[0.2em] text-black/40 sm:hidden">
+        {
+          mobileLabel
+        }
+      </p>
+
+      <p className="hidden font-rubik text-[8px] uppercase tracking-[0.35em] text-black/40 sm:block">
         {label}
       </p>
 
-      <p className="mt-3 font-display text-4xl font-light">
+      <p className="mt-2 font-display text-3xl font-light sm:mt-3 sm:text-4xl">
         {value
           .toString()
           .padStart(
@@ -1291,5 +1380,79 @@ function StatusBadge({
         ? "Oui"
         : "Non"}
     </span>
+  );
+}
+
+/*
+ * ==========================================================================
+ * TRASH ICON
+ * ==========================================================================
+ */
+
+function TrashIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      className="h-4 w-4"
+    >
+      <path
+        d="M4 7h16"
+        strokeLinecap="round"
+      />
+
+      <path
+        d="M9 7V4h6v3"
+        strokeLinecap="round"
+      />
+
+      <path
+        d="M6.5 7l1 13h9l1-13"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+
+      <path
+        d="M10 11v5M14 11v5"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+/*
+ * ==========================================================================
+ * DATE
+ * ==========================================================================
+ */
+
+function formatDate(
+  date: string
+) {
+  return new Date(
+    date
+  ).toLocaleDateString(
+    "fr-FR",
+    {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    }
+  );
+}
+
+function formatTime(
+  date: string
+) {
+  return new Date(
+    date
+  ).toLocaleTimeString(
+    "fr-FR",
+    {
+      hour: "2-digit",
+      minute: "2-digit",
+    }
   );
 }
