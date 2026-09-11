@@ -136,7 +136,7 @@ export default function AdminDashboard({
       method: "POST",
     });
 
-    router.push("/admin/login");
+    router.push("/teonar-admin/login");
     router.refresh();
   }
 

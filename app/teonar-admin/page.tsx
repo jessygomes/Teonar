@@ -34,7 +34,7 @@ export default async function AdminPage() {
   const token = cookieStore.get(COOKIE_NAME)?.value;
 
   if (!verifyAdminToken(token)) {
-    redirect("/admin/login");
+    redirect("/teonar-admin/login");
   }
 
   const sql = neon(process.env.DATABASE_URL!);
