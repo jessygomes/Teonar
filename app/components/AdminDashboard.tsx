@@ -1,10 +1,18 @@
 "use client";
 
 import {
+  useEffect,
   useMemo,
   useState,
 } from "react";
-import { useRouter } from "next/navigation";
+
+import type {
+  ReactNode,
+} from "react";
+
+import {
+  useRouter,
+} from "next/navigation";
 
 type Guest = {
   id: string;
@@ -20,7 +28,10 @@ type Guest = {
   created_at: string;
 };
 
-type BooleanFilter = "all" | "yes" | "no";
+type BooleanFilter =
+  | "all"
+  | "yes"
+  | "no";
 
 type SortOption =
   | "recent"
@@ -33,112 +44,394 @@ export default function AdminDashboard({
 }: {
   guests: Guest[];
 }) {
-  const router = useRouter();
+  const router =
+    useRouter();
 
-  const [search, setSearch] = useState("");
-  const [conciergeFilter, setConciergeFilter] =
-    useState<BooleanFilter>("all");
+  /*
+   * ------------------------------------------------------------------------
+   * INVITÉS
+   * ------------------------------------------------------------------------
+   */
 
-  const [dietFilter, setDietFilter] =
-    useState<BooleanFilter>("all");
+  const [
+    localGuests,
+    setLocalGuests,
+  ] =
+    useState<Guest[]>(
+      guests
+    );
 
-  const [sort, setSort] =
-    useState<SortOption>("recent");
+  /*
+   * Si router.refresh() récupère
+   * de nouvelles données depuis Neon,
+   * on resynchronise la liste locale.
+   */
 
-  const filteredGuests = useMemo(() => {
-    const normalizedSearch = search
-      .trim()
-      .toLowerCase();
+  useEffect(() => {
+    setLocalGuests(
+      guests
+    );
+  }, [guests]);
 
-    const result = guests.filter((guest) => {
-      const matchesSearch =
-        !normalizedSearch ||
-        [
-          guest.nom,
-          guest.prenom,
-          guest.email,
-          guest.telephone,
-          guest.profession,
-          guest.reseau_social ?? "",
-        ].some((value) =>
-          value
-            .toLowerCase()
-            .includes(normalizedSearch)
+  /*
+   * ------------------------------------------------------------------------
+   * FILTRES
+   * ------------------------------------------------------------------------
+   */
+
+  const [
+    search,
+    setSearch,
+  ] =
+    useState("");
+
+  const [
+    conciergeFilter,
+    setConciergeFilter,
+  ] =
+    useState<BooleanFilter>(
+      "all"
+    );
+
+  const [
+    dietFilter,
+    setDietFilter,
+  ] =
+    useState<BooleanFilter>(
+      "all"
+    );
+
+  const [
+    sort,
+    setSort,
+  ] =
+    useState<SortOption>(
+      "recent"
+    );
+
+  /*
+   * ------------------------------------------------------------------------
+   * SUPPRESSION
+   * ------------------------------------------------------------------------
+   */
+
+  const [
+    deletingId,
+    setDeletingId,
+  ] =
+    useState<
+      string | null
+    >(null);
+
+  /*
+   * ------------------------------------------------------------------------
+   * FILTRAGE + TRI
+   * ------------------------------------------------------------------------
+   */
+
+  const filteredGuests =
+    useMemo(() => {
+      const normalizedSearch =
+        search
+          .trim()
+          .toLowerCase();
+
+      const result =
+        localGuests.filter(
+          (guest) => {
+            /*
+             * Recherche
+             */
+
+            const searchableValues =
+              [
+                guest.nom,
+                guest.prenom,
+                guest.email,
+                guest.telephone,
+                guest.profession,
+                guest.reseau_social ??
+                  "",
+              ];
+
+            const matchesSearch =
+              !normalizedSearch ||
+              searchableValues.some(
+                (value) =>
+                  value
+                    .toLowerCase()
+                    .includes(
+                      normalizedSearch
+                    )
+              );
+
+            /*
+             * Conciergerie
+             */
+
+            const matchesConcierge =
+              conciergeFilter ===
+                "all" ||
+              (conciergeFilter ===
+                "yes" &&
+                guest.conciergerie) ||
+              (conciergeFilter ===
+                "no" &&
+                !guest.conciergerie);
+
+            /*
+             * Régime alimentaire
+             */
+
+            const matchesDiet =
+              dietFilter ===
+                "all" ||
+              (dietFilter ===
+                "yes" &&
+                guest.regime_alimentaire) ||
+              (dietFilter ===
+                "no" &&
+                !guest.regime_alimentaire);
+
+            return (
+              matchesSearch &&
+              matchesConcierge &&
+              matchesDiet
+            );
+          }
         );
 
-      const matchesConcierge =
-        conciergeFilter === "all" ||
-        (conciergeFilter === "yes" &&
-          guest.conciergerie) ||
-        (conciergeFilter === "no" &&
-          !guest.conciergerie);
+      /*
+       * TRI
+       */
 
-      const matchesDiet =
-        dietFilter === "all" ||
-        (dietFilter === "yes" &&
-          guest.regime_alimentaire) ||
-        (dietFilter === "no" &&
-          !guest.regime_alimentaire);
+      return [
+        ...result,
+      ].sort(
+        (a, b) => {
+          switch (sort) {
+            case "old":
+              return (
+                new Date(
+                  a.created_at
+                ).getTime() -
+                new Date(
+                  b.created_at
+                ).getTime()
+              );
 
-      return (
-        matchesSearch &&
-        matchesConcierge &&
-        matchesDiet
+            case "name-asc":
+              return a.nom.localeCompare(
+                b.nom,
+                "fr"
+              );
+
+            case "name-desc":
+              return b.nom.localeCompare(
+                a.nom,
+                "fr"
+              );
+
+            case "recent":
+            default:
+              return (
+                new Date(
+                  b.created_at
+                ).getTime() -
+                new Date(
+                  a.created_at
+                ).getTime()
+              );
+          }
+        }
       );
-    });
+    }, [
+      localGuests,
+      search,
+      conciergeFilter,
+      dietFilter,
+      sort,
+    ]);
 
-    return [...result].sort((a, b) => {
-      switch (sort) {
-        case "old":
-          return (
-            new Date(a.created_at).getTime() -
-            new Date(b.created_at).getTime()
-          );
+  /*
+   * ------------------------------------------------------------------------
+   * STATISTIQUES
+   * ------------------------------------------------------------------------
+   */
 
-        case "name-asc":
-          return a.nom.localeCompare(
-            b.nom,
-            "fr"
-          );
+  const conciergeCount =
+    localGuests.filter(
+      (guest) =>
+        guest.conciergerie
+    ).length;
 
-        case "name-desc":
-          return b.nom.localeCompare(
-            a.nom,
-            "fr"
-          );
+  const dietCount =
+    localGuests.filter(
+      (guest) =>
+        guest.regime_alimentaire
+    ).length;
 
-        case "recent":
-        default:
-          return (
-            new Date(b.created_at).getTime() -
-            new Date(a.created_at).getTime()
-          );
-      }
-    });
-  }, [
-    guests,
-    search,
-    conciergeFilter,
-    dietFilter,
-    sort,
-  ]);
-
-  const conciergeCount = guests.filter(
-    (guest) => guest.conciergerie
-  ).length;
-
-  const dietCount = guests.filter(
-    (guest) => guest.regime_alimentaire
-  ).length;
+  /*
+   * ------------------------------------------------------------------------
+   * DÉCONNEXION
+   * ------------------------------------------------------------------------
+   */
 
   async function logout() {
-    await fetch("/api/admin/logout", {
-      method: "POST",
-    });
+    try {
+      await fetch(
+        "/api/admin/logout",
+        {
+          method: "POST",
+        }
+      );
+    } finally {
+      router.push("/teonar-admin");
 
-    router.push("/teonar-admin/login");
-    router.refresh();
+      router.refresh();
+    }
   }
+
+  /*
+   * ------------------------------------------------------------------------
+   * SUPPRESSION D'UN INVITÉ
+   * ------------------------------------------------------------------------
+   */
+
+  async function deleteGuest(
+    guest: Guest
+  ) {
+    /*
+     * Confirmation navigateur.
+     */
+
+    const confirmed =
+      window.confirm(
+        `Supprimer définitivement ${guest.prenom} ${guest.nom} de la liste des invités ?`
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setDeletingId(
+        guest.id
+      );
+
+      /*
+       * Requête DELETE.
+       */
+
+      const response =
+        await fetch(
+          `/api/admin/rsvp/${guest.id}`,
+          {
+            method:
+              "DELETE",
+
+            cache:
+              "no-store",
+          }
+        );
+
+      /*
+       * On ne fait PAS :
+       *
+       * await response.json()
+       *
+       * directement.
+       *
+       * Si Next renvoie une page HTML ou
+       * une réponse vide lors d'une erreur,
+       * response.json() provoquerait :
+       *
+       * Unexpected end of JSON input
+       */
+
+      const responseText =
+        await response.text();
+
+      let data:
+        | {
+            success?: boolean;
+            message?: string;
+          }
+        | null = null;
+
+      if (responseText) {
+        try {
+          data =
+            JSON.parse(
+              responseText
+            );
+        } catch {
+          /*
+           * Réponse non JSON.
+           *
+           * On laisse data à null.
+           */
+          data = null;
+        }
+      }
+
+      /*
+       * Erreur API.
+       */
+
+      if (!response.ok) {
+        throw new Error(
+          data?.message ??
+            `Erreur lors de la suppression (${response.status}).`
+        );
+      }
+
+      /*
+       * Suppression immédiate dans
+       * l'interface.
+       */
+
+      setLocalGuests(
+        (
+          currentGuests
+        ) =>
+          currentGuests.filter(
+            (
+              currentGuest
+            ) =>
+              currentGuest.id !==
+              guest.id
+          )
+      );
+
+      /*
+       * Mise à jour du Server Component.
+       */
+
+      router.refresh();
+    } catch (error) {
+      console.error(
+        "DELETE GUEST ERROR:",
+        error
+      );
+
+      window.alert(
+        error instanceof Error
+          ? error.message
+          : "Impossible de supprimer cet invité."
+      );
+    } finally {
+      setDeletingId(
+        null
+      );
+    }
+  }
+
+  /*
+   * ------------------------------------------------------------------------
+   * EXPORT CSV
+   * ------------------------------------------------------------------------
+   */
 
   function exportCSV() {
     const headers = [
@@ -154,77 +447,143 @@ export default function AdminDashboard({
       "Inscription",
     ];
 
-    const escapeCSV = (
-      value: string | number | boolean | null
-    ) => {
+    function escapeCSV(
+      value:
+        | string
+        | number
+        | boolean
+        | null
+        | undefined
+    ) {
       const text =
         value === null ||
-        value === undefined
+        value ===
+          undefined
           ? ""
-          : String(value);
+          : String(
+              value
+            );
 
-      return `"${text.replace(/"/g, '""')}"`;
-    };
+      return `"${text.replace(
+        /"/g,
+        '""'
+      )}"`;
+    }
 
-    const rows = filteredGuests.map(
-      (guest) => [
-        guest.prenom,
-        guest.nom,
-        guest.email,
-        guest.telephone,
-        guest.profession,
-        guest.reseau_social ?? "",
-        guest.conciergerie ? "Oui" : "Non",
-        guest.regime_alimentaire
-          ? "Oui"
-          : "Non",
-        guest.regime_commentaire ?? "",
-        new Date(
-          guest.created_at
-        ).toLocaleString("fr-FR"),
-      ]
-    );
+    /*
+     * L'export respecte les filtres actifs.
+     */
+
+    const rows =
+      filteredGuests.map(
+        (guest) => [
+          guest.prenom,
+
+          guest.nom,
+
+          guest.email,
+
+          guest.telephone,
+
+          guest.profession,
+
+          guest.reseau_social ??
+            "",
+
+          guest.conciergerie
+            ? "Oui"
+            : "Non",
+
+          guest.regime_alimentaire
+            ? "Oui"
+            : "Non",
+
+          guest.regime_commentaire ??
+            "",
+
+          new Date(
+            guest.created_at
+          ).toLocaleString(
+            "fr-FR"
+          ),
+        ]
+      );
 
     const csv = [
       headers
-        .map(escapeCSV)
+        .map(
+          escapeCSV
+        )
         .join(";"),
-      ...rows.map((row) =>
-        row.map(escapeCSV).join(";")
+
+      ...rows.map(
+        (row) =>
+          row
+            .map(
+              escapeCSV
+            )
+            .join(";")
       ),
     ].join("\n");
 
-    const blob = new Blob(
-      ["\uFEFF" + csv],
-      {
-        type: "text/csv;charset=utf-8;",
-      }
-    );
+    /*
+     * BOM UTF-8 pour éviter les problèmes
+     * d'accents dans Excel.
+     */
+
+    const blob =
+      new Blob(
+        [
+          "\uFEFF" +
+            csv,
+        ],
+        {
+          type:
+            "text/csv;charset=utf-8;",
+        }
+      );
 
     const url =
-      URL.createObjectURL(blob);
+      URL.createObjectURL(
+        blob
+      );
 
     const link =
-      document.createElement("a");
+      document.createElement(
+        "a"
+      );
 
-    link.href = url;
+    link.href =
+      url;
+
     link.download =
       "teonar-eventum-rsvp.csv";
 
-    document.body.appendChild(link);
+    document.body.appendChild(
+      link
+    );
 
     link.click();
+
     link.remove();
 
-    URL.revokeObjectURL(url);
+    URL.revokeObjectURL(
+      url
+    );
   }
+
+  /*
+   * ------------------------------------------------------------------------
+   * UI
+   * ------------------------------------------------------------------------
+   */
 
   return (
     <main className="min-h-screen bg-[#F1EEE7] text-[#171512]">
       {/* HEADER */}
 
       <header className="border-b border-black/10 px-6 py-7 lg:px-10">
-        <div className="mx-auto flex max-w-[1600px] items-center justify-between">
+        <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-6">
           <div>
             <p className="font-rubik text-[8px] uppercase tracking-[0.45em] text-[#815B3E]">
               TEONAR EVENTUM
@@ -236,24 +595,56 @@ export default function AdminDashboard({
           </div>
 
           <div className="flex items-center gap-3">
+            {/* ACTUALISER */}
+
             <button
+              type="button"
               onClick={() =>
                 router.refresh()
               }
-              className="border border-black/15 px-5 py-3 font-rubik text-[8px] uppercase tracking-[0.25em] transition-colors hover:bg-black/5"
+              className="
+                border
+                border-black/15
+                px-5
+                py-3
+                font-rubik
+                text-[8px]
+                uppercase
+                tracking-[0.25em]
+                transition-colors
+                hover:bg-black/5
+              "
             >
               Actualiser
             </button>
 
+            {/* DÉCONNEXION */}
+
             <button
-              onClick={logout}
-              className="bg-[#171512] px-5 py-3 font-rubik text-[8px] uppercase tracking-[0.25em] text-white transition-colors hover:bg-[#815B3E]"
+              type="button"
+              onClick={
+                logout
+              }
+              className="
+                bg-[#171512]
+                px-5
+                py-3
+                font-rubik
+                text-[8px]
+                uppercase
+                tracking-[0.25em]
+                text-white
+                transition-colors
+                hover:bg-[#815B3E]
+              "
             >
               Déconnexion
             </button>
           </div>
         </div>
       </header>
+
+      {/* CONTENU */}
 
       <div className="mx-auto max-w-[1600px] px-6 py-10 lg:px-10">
         {/* TITRE */}
@@ -269,9 +660,28 @@ export default function AdminDashboard({
             </h2>
           </div>
 
+          {/* EXPORT */}
+
           <button
-            onClick={exportCSV}
-            className="w-fit border border-[#171512] px-6 py-4 font-rubik text-[8px] uppercase tracking-[0.3em] transition-colors hover:bg-[#171512] hover:text-[#F1EEE7]"
+            type="button"
+            onClick={
+              exportCSV
+            }
+            className="
+              w-fit
+              border
+              border-[#171512]
+              px-6
+              py-4
+              font-rubik
+              text-[8px]
+              uppercase
+              tracking-[0.3em]
+              transition-colors
+
+              hover:bg-[#171512]
+              hover:text-[#F1EEE7]
+            "
           >
             Exporter CSV
           </button>
@@ -282,44 +692,85 @@ export default function AdminDashboard({
         <div className="mb-10 grid grid-cols-1 border border-black/10 sm:grid-cols-3">
           <Stat
             label="Invités"
-            value={guests.length}
+            value={
+              localGuests.length
+            }
           />
 
           <Stat
             label="Conciergerie"
-            value={conciergeCount}
+            value={
+              conciergeCount
+            }
           />
 
           <Stat
             label="Régimes particuliers"
-            value={dietCount}
+            value={
+              dietCount
+            }
             last
           />
         </div>
 
-        {/* FILTERS */}
+        {/* FILTRES */}
 
         <div className="mb-8 grid gap-4 lg:grid-cols-[1fr_auto_auto_auto]">
+          {/* RECHERCHE */}
+
           <input
-            value={search}
-            onChange={(event) =>
+            value={
+              search
+            }
+            onChange={(
+              event
+            ) =>
               setSearch(
-                event.target.value
+                event
+                  .target
+                  .value
               )
             }
             placeholder="Rechercher un invité..."
-            className="border border-black/15 bg-transparent px-5 py-4 font-rubik text-sm outline-none placeholder:text-black/30 focus:border-[#815B3E]"
+            className="
+              border
+              border-black/15
+              bg-transparent
+              px-5
+              py-4
+              font-rubik
+              text-sm
+              outline-none
+              placeholder:text-black/30
+              focus:border-[#815B3E]
+            "
           />
 
+          {/* CONCIERGERIE */}
+
           <select
-            value={conciergeFilter}
-            onChange={(event) =>
+            value={
+              conciergeFilter
+            }
+            onChange={(
+              event
+            ) =>
               setConciergeFilter(
-                event.target
+                event
+                  .target
                   .value as BooleanFilter
               )
             }
-            className="border border-black/15 bg-transparent px-5 py-4 font-rubik text-xs outline-none"
+            className="
+              border
+              border-black/15
+              bg-transparent
+              px-5
+              py-4
+              font-rubik
+              text-xs
+              outline-none
+            "
           >
             <option value="all">
               Conciergerie · Tous
@@ -334,15 +785,31 @@ export default function AdminDashboard({
             </option>
           </select>
 
+          {/* RÉGIME */}
+
           <select
-            value={dietFilter}
-            onChange={(event) =>
+            value={
+              dietFilter
+            }
+            onChange={(
+              event
+            ) =>
               setDietFilter(
-                event.target
+                event
+                  .target
                   .value as BooleanFilter
               )
             }
-            className="border border-black/15 bg-transparent px-5 py-4 font-rubik text-xs outline-none"
+            className="
+              border
+              border-black/15
+              bg-transparent
+              px-5
+              py-4
+              font-rubik
+              text-xs
+              outline-none
+            "
           >
             <option value="all">
               Régime · Tous
@@ -357,15 +824,31 @@ export default function AdminDashboard({
             </option>
           </select>
 
+          {/* TRI */}
+
           <select
-            value={sort}
-            onChange={(event) =>
+            value={
+              sort
+            }
+            onChange={(
+              event
+            ) =>
               setSort(
-                event.target
+                event
+                  .target
                   .value as SortOption
               )
             }
-            className="border border-black/15 bg-transparent px-5 py-4 font-rubik text-xs outline-none"
+            className="
+              border
+              border-black/15
+              bg-transparent
+              px-5
+              py-4
+              font-rubik
+              text-xs
+              outline-none
+            "
           >
             <option value="recent">
               Plus récents
@@ -388,8 +871,12 @@ export default function AdminDashboard({
         {/* NOMBRE DE RÉSULTATS */}
 
         <p className="mb-4 font-rubik text-[9px] uppercase tracking-[0.3em] text-black/40">
-          {filteredGuests.length} résultat
-          {filteredGuests.length > 1
+          {
+            filteredGuests.length
+          }{" "}
+          résultat
+          {filteredGuests.length >
+          1
             ? "s"
             : ""}
         </p>
@@ -397,7 +884,7 @@ export default function AdminDashboard({
         {/* TABLE */}
 
         <div className="overflow-x-auto border border-black/10 bg-[#F7F4EE]">
-          <table className="w-full min-w-[1400px] border-collapse text-left">
+          <table className="w-full min-w-[1500px] border-collapse text-left">
             <thead>
               <tr className="border-b border-black/10">
                 <TableHeader>
@@ -427,47 +914,95 @@ export default function AdminDashboard({
                 <TableHeader>
                   Inscription
                 </TableHeader>
+
+                <TableHeader>
+                  Action
+                </TableHeader>
               </tr>
             </thead>
 
             <tbody>
               {filteredGuests.map(
-                (guest) => (
+                (
+                  guest
+                ) => (
                   <tr
-                    key={guest.id}
-                    className="border-b border-black/[0.07] align-top transition-colors last:border-0 hover:bg-black/[0.025]"
+                    key={
+                      guest.id
+                    }
+                    className="
+                      border-b
+                      border-black/[0.07]
+                      align-top
+                      transition-colors
+                      last:border-0
+                      hover:bg-black/[0.025]
+                    "
                   >
+                    {/* INVITÉ */}
+
                     <TableCell>
                       <p className="font-rubik text-sm font-medium">
-                        {guest.prenom}{" "}
-                        {guest.nom}
+                        {
+                          guest.prenom
+                        }{" "}
+                        {
+                          guest.nom
+                        }
                       </p>
                     </TableCell>
+
+                    {/* CONTACT */}
 
                     <TableCell>
                       <a
                         href={`mailto:${guest.email}`}
-                        className="block font-rubik text-xs text-black/70 hover:text-[#815B3E]"
+                        className="
+                          block
+                          font-rubik
+                          text-xs
+                          text-black/70
+                          hover:text-[#815B3E]
+                        "
                       >
-                        {guest.email}
+                        {
+                          guest.email
+                        }
                       </a>
 
                       <a
                         href={`tel:${guest.telephone}`}
-                        className="mt-2 block font-rubik text-xs text-black/40 hover:text-black"
+                        className="
+                          mt-2
+                          block
+                          font-rubik
+                          text-xs
+                          text-black/40
+                          hover:text-black
+                        "
                       >
-                        {guest.telephone}
+                        {
+                          guest.telephone
+                        }
                       </a>
                     </TableCell>
 
+                    {/* PROFESSION */}
+
                     <TableCell>
-                      {guest.profession}
+                      {
+                        guest.profession
+                      }
                     </TableCell>
+
+                    {/* RÉSEAU */}
 
                     <TableCell>
                       {guest.reseau_social ||
                         "—"}
                     </TableCell>
+
+                    {/* CONCIERGERIE */}
 
                     <TableCell>
                       <StatusBadge
@@ -476,6 +1011,8 @@ export default function AdminDashboard({
                         }
                       />
                     </TableCell>
+
+                    {/* RÉGIME */}
 
                     <TableCell>
                       <StatusBadge
@@ -494,15 +1031,22 @@ export default function AdminDashboard({
                         )}
                     </TableCell>
 
+                    {/* DATE */}
+
                     <TableCell>
                       {new Date(
                         guest.created_at
                       ).toLocaleDateString(
                         "fr-FR",
                         {
-                          day: "2-digit",
-                          month: "2-digit",
-                          year: "numeric",
+                          day:
+                            "2-digit",
+
+                          month:
+                            "2-digit",
+
+                          year:
+                            "numeric",
                         }
                       )}
 
@@ -512,22 +1056,78 @@ export default function AdminDashboard({
                         ).toLocaleTimeString(
                           "fr-FR",
                           {
-                            hour: "2-digit",
-                            minute: "2-digit",
+                            hour:
+                              "2-digit",
+
+                            minute:
+                              "2-digit",
                           }
                         )}
                       </p>
+                    </TableCell>
+
+                    {/* ACTION */}
+
+                    <TableCell>
+                      <button
+                        type="button"
+                        disabled={
+                          deletingId ===
+                          guest.id
+                        }
+                        onClick={() =>
+                          deleteGuest(
+                            guest
+                          )
+                        }
+                        className="
+                          border
+                          border-red-900/20
+                          px-4
+                          py-2.5
+                          font-rubik
+                          text-[8px]
+                          uppercase
+                          tracking-[0.2em]
+                          text-red-800
+                          transition-all
+                          duration-300
+
+                          hover:border-red-900
+                          hover:bg-red-900
+                          hover:text-white
+
+                          disabled:cursor-not-allowed
+                          disabled:opacity-40
+                        "
+                      >
+                        {deletingId ===
+                        guest.id
+                          ? "Suppression..."
+                          : "Supprimer"}
+                      </button>
                     </TableCell>
                   </tr>
                 )
               )}
 
+              {/* AUCUN RÉSULTAT */}
+
               {filteredGuests.length ===
                 0 && (
                 <tr>
                   <td
-                    colSpan={7}
-                    className="px-8 py-20 text-center font-rubik text-sm text-black/40"
+                    colSpan={
+                      8
+                    }
+                    className="
+                      px-8
+                      py-20
+                      text-center
+                      font-rubik
+                      text-sm
+                      text-black/40
+                    "
                   >
                     Aucun invité ne
                     correspond à ces
@@ -542,6 +1142,12 @@ export default function AdminDashboard({
     </main>
   );
 }
+
+/*
+ * ==========================================================================
+ * STAT
+ * ==========================================================================
+ */
 
 function Stat({
   label,
@@ -567,35 +1173,79 @@ function Stat({
       <p className="mt-3 font-display text-4xl font-light">
         {value
           .toString()
-          .padStart(2, "0")}
+          .padStart(
+            2,
+            "0"
+          )}
       </p>
     </div>
   );
 }
 
+/*
+ * ==========================================================================
+ * TABLE HEADER
+ * ==========================================================================
+ */
+
 function TableHeader({
   children,
 }: {
-  children: React.ReactNode;
+  children:
+    ReactNode;
 }) {
   return (
-    <th className="whitespace-nowrap px-6 py-5 font-rubik text-[8px] font-normal uppercase tracking-[0.3em] text-black/40">
+    <th
+      className="
+        whitespace-nowrap
+        px-6
+        py-5
+        font-rubik
+        text-[8px]
+        font-normal
+        uppercase
+        tracking-[0.3em]
+        text-black/40
+      "
+    >
       {children}
     </th>
   );
 }
 
+/*
+ * ==========================================================================
+ * TABLE CELL
+ * ==========================================================================
+ */
+
 function TableCell({
   children,
 }: {
-  children: React.ReactNode;
+  children:
+    ReactNode;
 }) {
   return (
-    <td className="px-6 py-6 font-rubik text-xs leading-5 text-black/65">
+    <td
+      className="
+        px-6
+        py-6
+        font-rubik
+        text-xs
+        leading-5
+        text-black/65
+      "
+    >
       {children}
     </td>
   );
 }
+
+/*
+ * ==========================================================================
+ * STATUS BADGE
+ * ==========================================================================
+ */
 
 function StatusBadge({
   value,
@@ -615,6 +1265,7 @@ function StatusBadge({
         text-[8px]
         uppercase
         tracking-[0.2em]
+
         ${
           value
             ? "bg-[#171512] text-[#F1EEE7]"
@@ -623,14 +1274,22 @@ function StatusBadge({
       `}
     >
       <span
-        className={`h-1.5 w-1.5 rounded-full ${
-          value
-            ? "bg-[#A97A54]"
-            : "bg-black/20"
-        }`}
+        className={`
+          h-1.5
+          w-1.5
+          rounded-full
+
+          ${
+            value
+              ? "bg-[#A97A54]"
+              : "bg-black/20"
+          }
+        `}
       />
 
-      {value ? "Oui" : "Non"}
+      {value
+        ? "Oui"
+        : "Non"}
     </span>
   );
 }

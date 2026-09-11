@@ -1,61 +1,159 @@
 "use client";
 
 import { useState } from "react";
-import type { FormEvent, ReactNode } from "react";
 
-type Status = "idle" | "submitting" | "success" | "error";
-type Choice = "oui" | "non" | "";
+import type {
+  FormEvent,
+  ReactNode,
+} from "react";
+
+type Status =
+  | "idle"
+  | "submitting"
+  | "success"
+  | "error";
+
+type Choice =
+  | "oui"
+  | "non"
+  | "";
 
 export default function RSVPForm() {
-  const [conciergerie, setConciergerie] = useState<Choice>("");
-  const [regime, setRegime] = useState<Choice>("");
-  const [status, setStatus] = useState<Status>("idle");
-  const [errorMessage, setErrorMessage] = useState("");
+  const [
+    conciergerie,
+    setConciergerie,
+  ] = useState<Choice>("");
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  const [
+    regime,
+    setRegime,
+  ] = useState<Choice>("");
+
+  const [
+    status,
+    setStatus,
+  ] = useState<Status>("idle");
+
+  const [
+    errorMessage,
+    setErrorMessage,
+  ] = useState("");
+
+  /*
+   * URL retournée par /api/rsvp
+   *
+   * Exemple :
+   * /api/invitation/uuid-du-rsvp
+   */
+  const [
+    invitationUrl,
+    setInvitationUrl,
+  ] = useState("");
+
+  async function handleSubmit(
+    event: FormEvent<HTMLFormElement>
+  ) {
     event.preventDefault();
 
-    if (!conciergerie || !regime) {
+    /*
+     * Validation des boutons Oui / Non
+     */
+
+    if (
+      !conciergerie ||
+      !regime
+    ) {
       setStatus("error");
+
       setErrorMessage(
         "Merci de répondre à toutes les questions ci-dessous."
       );
+
       return;
     }
 
     setStatus("submitting");
     setErrorMessage("");
 
-    const form = event.currentTarget;
-    const formData = new FormData(form);
+    /*
+     * On garde la référence du formulaire
+     * avant les opérations async.
+     */
+
+    const form =
+      event.currentTarget;
+
+    const formData =
+      new FormData(form);
 
     const payload = {
-      ...Object.fromEntries(formData.entries()),
+      ...Object.fromEntries(
+        formData.entries()
+      ),
+
       conciergerie,
-      regimeAlimentaire: regime,
+
+      regimeAlimentaire:
+        regime,
     };
 
     try {
-      const response = await fetch("/api/rsvp", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
+      const response =
+        await fetch(
+          "/api/rsvp",
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body: JSON.stringify(
+              payload
+            ),
+          }
+        );
+
+      const data =
+        await response.json();
+
+      /*
+       * Erreur API
+       */
 
       if (!response.ok) {
-        const data = await response.json().catch(() => null);
-
         throw new Error(
-          data?.message ?? "Une erreur est survenue."
+          data?.message ??
+            "Une erreur est survenue."
         );
       }
+
+      /*
+       * URL du PDF personnalisé
+       */
+
+      if (
+        data.invitationUrl
+      ) {
+        setInvitationUrl(
+          data.invitationUrl
+        );
+      }
+
+      /*
+       * Reset du formulaire
+       */
 
       form.reset();
 
       setConciergerie("");
       setRegime("");
+
+      /*
+       * Écran de succès
+       */
+
       setStatus("success");
     } catch (error) {
       setStatus("error");
@@ -68,11 +166,20 @@ export default function RSVPForm() {
     }
   }
 
-  if (status === "success") {
+  /*
+   * ------------------------------------------------------------------------
+   * ÉCRAN APRÈS CONFIRMATION
+   * ------------------------------------------------------------------------
+   */
+
+  if (
+    status === "success"
+  ) {
     return (
       <div className="flex w-full flex-1 flex-col justify-center py-10">
         <div className="max-w-md">
-          {/* Icône */}
+          {/* ICÔNE VALIDATION */}
+
           <div className="mb-10 flex h-14 w-14 items-center justify-center border border-black/15">
             <svg
               viewBox="0 0 24 24"
@@ -89,32 +196,119 @@ export default function RSVPForm() {
             </svg>
           </div>
 
+          {/* LABEL */}
+
           <p className="mb-4 font-rubik text-[9px] uppercase tracking-[0.42em] text-[#815B3E]">
             Confirmation reçue
           </p>
 
+          {/* TITRE */}
+
           <h3 className="font-display text-4xl font-light leading-[1.05] tracking-[-0.025em] text-[#171512] sm:text-5xl">
-            Merci pour votre réponse.
+            Votre présence est confirmée.
           </h3>
 
+          {/* DESCRIPTION */}
+
           <p className="mt-6 font-rubik text-sm font-light leading-7 text-black/50">
-            Votre présence au TEONAR EVENTUM est enregistrée.
-            <br />
-            La Maison TEONAR se réjouit de vous recevoir.
+            La Maison TEONAR se réjouit de vous recevoir à
+            l&apos;occasion du TEONAR EVENTUM.
           </p>
 
-          <div className="mt-10 h-px w-16 bg-[#815B3E]" />
+          {/* SEPARATEUR */}
+
+          <div className="my-9 h-px w-full bg-black/10" />
+
+          {/* INVITATION */}
+
+          <div>
+            <p className="font-rubik text-[9px] uppercase tracking-[0.35em] text-[#815B3E]">
+              Votre invitation
+            </p>
+
+            <p className="mt-4 font-rubik text-[13px] font-light leading-6 text-black/55">
+              Votre faire-part personnel est prêt.
+              Conservez-le afin de retrouver toutes les
+              informations relatives à la soirée.
+            </p>
+
+            {/* BOUTON DOWNLOAD */}
+
+            {invitationUrl && (
+              <a
+                href={invitationUrl}
+                className="
+                  group
+                  mt-7
+                  flex
+                  w-full
+                  items-center
+                  justify-between
+                  bg-[#171512]
+                  px-7
+                  py-5
+                  font-rubik
+                  text-[9px]
+                  uppercase
+                  tracking-[0.3em]
+                  text-[#F1EEE7]
+                  transition-all
+                  duration-500
+                  hover:bg-[#815B3E]
+                "
+              >
+                <span>
+                  Télécharger mon invitation
+                </span>
+
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1"
+                  className="h-5 w-5"
+                >
+                  <path
+                    d="M12 4v12M7 11l5 5 5-5M5 20h14"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </a>
+            )}
+          </div>
+
+          {/* FOOTER */}
+
+          <div className="mt-8 flex items-center gap-4">
+            <div className="h-px w-10 bg-[#815B3E]" />
+
+            <p className="font-rubik text-[8px] uppercase tracking-[0.3em] text-black/30">
+              Jeudi 1
+              <sup>er</sup>{" "}
+              octobre 2026 · Paris
+            </p>
+          </div>
         </div>
       </div>
     );
   }
 
+  /*
+   * ------------------------------------------------------------------------
+   * FORMULAIRE
+   * ------------------------------------------------------------------------
+   */
+
   return (
     <form
-      onSubmit={handleSubmit}
+      onSubmit={
+        handleSubmit
+      }
       className="flex w-full flex-col gap-14"
     >
       {/* COORDONNÉES */}
+
       <Section title="Vos coordonnées">
         <div className="grid grid-cols-1 gap-x-8 gap-y-8 sm:grid-cols-2">
           <FloatingField
@@ -162,35 +356,57 @@ export default function RSVPForm() {
       </Section>
 
       {/* PRÉFÉRENCES */}
+
       <Section title="Vos préférences">
         <div className="flex flex-col">
           <Toggle
             label="Souhaitez-vous utiliser le service de conciergerie proposé par la Maison ?"
-            value={conciergerie}
-            onChange={setConciergerie}
+            value={
+              conciergerie
+            }
+            onChange={
+              setConciergerie
+            }
           />
 
           <div className="pt-7">
             <Toggle
               label="Avez-vous un régime alimentaire particulier, une allergie ou une restriction ?"
-              value={regime}
-              onChange={setRegime}
-              withBorder={regime !== "oui"}
+              value={
+                regime
+              }
+              onChange={
+                setRegime
+              }
+              withBorder={
+                regime !== "oui"
+              }
             />
 
+            {/* COMMENTAIRE RÉGIME */}
+
             <div
-              className={`grid transition-all duration-500 ${
-                regime === "oui"
-                  ? "grid-rows-[1fr] opacity-100"
-                  : "grid-rows-[0fr] opacity-0"
-              }`}
+              className={`
+                grid
+                transition-all
+                duration-500
+                ${
+                  regime ===
+                  "oui"
+                    ? "grid-rows-[1fr] opacity-100"
+                    : "grid-rows-[0fr] opacity-0"
+                }
+              `}
             >
               <div className="overflow-hidden">
                 <div className="border-b border-black/10 pb-7 pt-7">
                   <FloatingTextarea
                     label="Précisez votre régime ou vos allergies"
                     name="regimeCommentaire"
-                    required={regime === "oui"}
+                    required={
+                      regime ===
+                      "oui"
+                    }
                   />
                 </div>
               </div>
@@ -200,6 +416,7 @@ export default function RSVPForm() {
       </Section>
 
       {/* CONFIRMATION */}
+
       <Section title="Confirmation">
         <label className="group flex cursor-pointer items-start gap-4">
           <input
@@ -208,6 +425,8 @@ export default function RSVPForm() {
             required
             className="peer sr-only"
           />
+
+          {/* CHECKBOX */}
 
           <span
             className="
@@ -232,7 +451,17 @@ export default function RSVPForm() {
               fill="none"
               stroke="currentColor"
               strokeWidth="1.5"
-              className="h-3 w-3 scale-75 text-[#F1EEE7] opacity-0 transition-all duration-300 peer-checked:scale-100 peer-checked:opacity-100"
+              className="
+                h-3
+                w-3
+                scale-75
+                text-[#F1EEE7]
+                opacity-0
+                transition-all
+                duration-300
+                peer-checked:scale-100
+                peer-checked:opacity-100
+              "
             >
               <path
                 d="M4 10.5 8 14l8-9"
@@ -244,23 +473,32 @@ export default function RSVPForm() {
 
           <span className="font-rubik text-[13px] font-light leading-6 text-black/60 transition-colors duration-300 group-hover:text-black/80">
             J&apos;atteste de ma présence le jeudi 1
-            <sup>er</sup> octobre 2026 lors du TEONAR EVENTUM.
+            <sup>er</sup>{" "}
+            octobre 2026 lors du TEONAR EVENTUM.
           </span>
         </label>
 
-        {/* ERREUR */}
-        {status === "error" && (
+        {/* MESSAGE ERREUR */}
+
+        {status ===
+          "error" && (
           <div className="mt-6 border-l border-red-700/60 pl-4">
             <p className="font-rubik text-xs font-light leading-5 text-red-800">
-              {errorMessage}
+              {
+                errorMessage
+              }
             </p>
           </div>
         )}
 
-        {/* CTA */}
+        {/* SUBMIT */}
+
         <button
           type="submit"
-          disabled={status === "submitting"}
+          disabled={
+            status ===
+            "submitting"
+          }
           className="
             group
             mt-9
@@ -284,12 +522,14 @@ export default function RSVPForm() {
           "
         >
           <span>
-            {status === "submitting"
+            {status ===
+            "submitting"
               ? "Enregistrement..."
               : "Confirmer ma présence"}
           </span>
 
-          {status === "submitting" ? (
+          {status ===
+          "submitting" ? (
             <span className="h-4 w-4 animate-spin rounded-full border border-white/30 border-t-white" />
           ) : (
             <svg
@@ -316,9 +556,11 @@ export default function RSVPForm() {
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/*                                   SECTION                                  */
-/* -------------------------------------------------------------------------- */
+/*
+ * ==========================================================================
+ * SECTION
+ * ==========================================================================
+ */
 
 function Section({
   title,
@@ -342,9 +584,11 @@ function Section({
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/*                                    INPUT                                   */
-/* -------------------------------------------------------------------------- */
+/*
+ * ==========================================================================
+ * INPUT
+ * ==========================================================================
+ */
 
 function FloatingField({
   label,
@@ -365,8 +609,12 @@ function FloatingField({
         id={name}
         name={name}
         type={type}
-        required={required}
-        autoComplete={autoComplete}
+        required={
+          required
+        }
+        autoComplete={
+          autoComplete
+        }
         placeholder=" "
         className="
           peer
@@ -416,15 +664,19 @@ function FloatingField({
         "
       >
         {label}
-        {required && " *"}
+
+        {required &&
+          " *"}
       </label>
     </div>
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/*                                  TEXTAREA                                  */
-/* -------------------------------------------------------------------------- */
+/*
+ * ==========================================================================
+ * TEXTAREA
+ * ==========================================================================
+ */
 
 function FloatingTextarea({
   label,
@@ -441,7 +693,9 @@ function FloatingTextarea({
         id={name}
         name={name}
         rows={3}
-        required={required}
+        required={
+          required
+        }
         placeholder=" "
         className="
           peer
@@ -493,15 +747,19 @@ function FloatingTextarea({
         "
       >
         {label}
-        {required && " *"}
+
+        {required &&
+          " *"}
       </label>
     </div>
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/*                                   TOGGLE                                   */
-/* -------------------------------------------------------------------------- */
+/*
+ * ==========================================================================
+ * TOGGLE
+ * ==========================================================================
+ */
 
 function Toggle({
   label,
@@ -511,7 +769,9 @@ function Toggle({
 }: {
   label: string;
   value: Choice;
-  onChange: (value: Choice) => void;
+  onChange: (
+    value: Choice
+  ) => void;
   withBorder?: boolean;
 }) {
   return (
@@ -521,11 +781,17 @@ function Toggle({
         flex-col
         gap-5
         pb-7
+
         sm:flex-row
         sm:items-center
         sm:justify-between
         sm:gap-8
-        ${withBorder ? "border-b border-black/10" : ""}
+
+        ${
+          withBorder
+            ? "border-b border-black/10"
+            : ""
+        }
       `}
     >
       <p className="max-w-sm font-rubik text-[13px] font-light leading-6 text-black/60">
@@ -533,37 +799,58 @@ function Toggle({
       </p>
 
       <div className="flex w-fit shrink-0 border border-black/15 p-1">
-        {(["oui", "non"] as const).map((option) => {
-          const active = value === option;
+        {(
+          [
+            "oui",
+            "non",
+          ] as const
+        ).map(
+          (
+            option
+          ) => {
+            const active =
+              value ===
+              option;
 
-          return (
-            <button
-              key={option}
-              type="button"
-              aria-pressed={active}
-              onClick={() => onChange(option)}
-              className={`
-                min-w-[72px]
-                px-5
-                py-2.5
-                font-rubik
-                text-[9px]
-                uppercase
-                tracking-[0.25em]
-                transition-all
-                duration-300
-
-                ${
-                  active
-                    ? "bg-[#171512] text-[#F1EEE7]"
-                    : "text-black/35 hover:bg-black/[0.04] hover:text-black/70"
+            return (
+              <button
+                key={
+                  option
                 }
-              `}
-            >
-              {option}
-            </button>
-          );
-        })}
+                type="button"
+                aria-pressed={
+                  active
+                }
+                onClick={() =>
+                  onChange(
+                    option
+                  )
+                }
+                className={`
+                  min-w-[72px]
+                  px-5
+                  py-2.5
+                  font-rubik
+                  text-[9px]
+                  uppercase
+                  tracking-[0.25em]
+                  transition-all
+                  duration-300
+
+                  ${
+                    active
+                      ? "bg-[#171512] text-[#F1EEE7]"
+                      : "text-black/35 hover:bg-black/[0.04] hover:text-black/70"
+                  }
+                `}
+              >
+                {
+                  option
+                }
+              </button>
+            );
+          }
+        )}
       </div>
     </div>
   );
